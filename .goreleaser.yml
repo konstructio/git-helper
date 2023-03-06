@@ -1,0 +1,19 @@
+project_name: git-helper
+release:
+  github:
+    owner: kubefirst
+    name: git-helper
+builds:
+  - id: git-helper
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+    env:
+      - CGO_ENABLED=0
+      - GO111MODULE=on
+    main: main.go
+    binary: git-helper
+    ldflags:
+      - -s -w -X github.com/kubefirst/git-helper/internal/common.Version={{ .Tag }}
