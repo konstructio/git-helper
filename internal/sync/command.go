@@ -23,6 +23,10 @@ const (
 	ngrokExistingTriggerKey   = "trigger-ngrok-reload"
 )
 
+// Key to match for Atlantis Vault secret
+// Webhook token key
+var atlantisSecretTokenKey string
+
 // CreateWebhook
 func CreateWebhook(req WebhookOptions) error {
 	if req.UseSecret {
@@ -136,6 +140,7 @@ func SynchronizeAtlantisWebhook(req WebhookOptions) error {
 	switch req.Provider {
 	case "github":
 		gh := githubWrapper.NewGitHubClient(os.Getenv("GIT_TOKEN"))
+		atlantisSecretTokenKey = "ATLANTIS_GH_WEBHOOK_SECRET"
 
 		// Use ConfigMap to get existing tunnel url if one exists
 		configmap, err := kubernetes.ReadConfigMapV2(req.KubeInClusterConfig, atlantisNamespace, ngrokConfigMapName)
@@ -176,7 +181,7 @@ func SynchronizeAtlantisWebhook(req WebhookOptions) error {
 				Org:        req.Owner,
 				Repository: req.Repository,
 				Url:        newWebhookEndpoint,
-				Token:      secret["token"],
+				Token:      secret[atlantisSecretTokenKey],
 			}
 			err = gh.CreateRepositoryWebhook(request)
 			if err != nil {
@@ -193,6 +198,7 @@ func SynchronizeAtlantisWebhook(req WebhookOptions) error {
 		gl := gitlabWrapper.GitLabWrapper{
 			Client: gitlabWrapper.NewGitLabClient(os.Getenv("GIT_TOKEN")),
 		}
+		atlantisSecretTokenKey = "ATLANTIS_GL_WEBHOOK_SECRET"
 
 		// Use ConfigMap to get existing tunnel url if one exists
 		configmap, err := kubernetes.ReadConfigMapV2(req.KubeInClusterConfig, atlantisNamespace, ngrokConfigMapName)
@@ -232,7 +238,7 @@ func SynchronizeAtlantisWebhook(req WebhookOptions) error {
 			request := &gitlabWrapper.ProjectHookRequest{
 				ProjectName: req.Repository,
 				Url:         newWebhookEndpoint,
-				Token:       secret["token"],
+				Token:       secret[atlantisSecretTokenKey],
 				CreateOpts: &gitlab.AddProjectHookOptions{
 					MergeRequestsEvents: &enabled,
 					NoteEvents:          &enabled,
