@@ -180,7 +180,7 @@ func SynchronizeAtlantisWebhook(req WebhookOptions) error {
 			request := githubWrapper.RepositoryHookRequest{
 				Org:        req.Owner,
 				Repository: req.Repository,
-				Url:        newWebhookEndpoint,
+				Url:        fmt.Sprintf("%s/events", newWebhookEndpoint),
 				Token:      secret[atlantisSecretTokenKey],
 			}
 			err = gh.CreateRepositoryWebhook(request)
@@ -237,7 +237,7 @@ func SynchronizeAtlantisWebhook(req WebhookOptions) error {
 			var enabled bool = true
 			request := &gitlabWrapper.ProjectHookRequest{
 				ProjectName: req.Repository,
-				Url:         newWebhookEndpoint,
+				Url:         fmt.Sprintf("%s/events", newWebhookEndpoint),
 				Token:       secret[atlantisSecretTokenKey],
 				CreateOpts: &gitlab.AddProjectHookOptions{
 					MergeRequestsEvents: &enabled,
