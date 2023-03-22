@@ -198,7 +198,7 @@ func SynchronizeAtlantisWebhook(req WebhookOptions) error {
 		gl := gitlabWrapper.GitLabWrapper{
 			Client: gitlabWrapper.NewGitLabClient(os.Getenv("GIT_TOKEN")),
 		}
-		atlantisSecretTokenKey = "ATLANTIS_GL_WEBHOOK_SECRET"
+		atlantisSecretTokenKey = "ATLANTIS_GITLAB_WEBHOOK_SECRET"
 
 		// Use ConfigMap to get existing tunnel url if one exists
 		configmap, err := kubernetes.ReadConfigMapV2(req.KubeInClusterConfig, atlantisNamespace, ngrokConfigMapName)
