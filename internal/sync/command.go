@@ -65,8 +65,6 @@ func CreateWebhook(req WebhookOptions) error {
 		var enabled bool = true
 		request := &gitlabWrapper.ProjectHookRequest{
 			ProjectName: req.Repository,
-			Url:         req.Url,
-			Token:       req.Token,
 			CreateOpts: &gitlab.AddProjectHookOptions{
 				MergeRequestsEvents: &enabled,
 				NoteEvents:          &enabled,
@@ -107,13 +105,10 @@ func DeleteWebhook(req WebhookOptions) error {
 		var enabled bool = true
 		request := &gitlabWrapper.ProjectHookRequest{
 			ProjectName: req.Repository,
-			Url:         req.Url,
-			Token:       req.Token,
 			CreateOpts: &gitlab.AddProjectHookOptions{
 				MergeRequestsEvents: &enabled,
 				NoteEvents:          &enabled,
 				PushEvents:          &enabled,
-				Token:               &req.Token,
 				URL:                 &req.Url,
 			},
 		}
@@ -207,10 +202,13 @@ func SynchronizeAtlantisWebhook(req WebhookOptions) error {
 		}
 
 		// Delete existing webhook if it exists
+		var url string = configmap[ngrokExistingTunnelKey]
 		if configmap[ngrokExistingTunnelKey] != "placeholder" {
 			request := &gitlabWrapper.ProjectHookRequest{
 				ProjectName: req.Repository,
-				Url:         configmap[ngrokExistingTunnelKey],
+				CreateOpts: &gitlab.AddProjectHookOptions{
+					URL: &url,
+				},
 			}
 			err = gl.DeleteProjectWebhook(request)
 			if err != nil {
@@ -236,15 +234,15 @@ func SynchronizeAtlantisWebhook(req WebhookOptions) error {
 			// Create new repository secret
 			var enabled bool = true
 			var webhookURL string = fmt.Sprintf("%s/events", newWebhookEndpoint)
+			var token string = secret[atlantisSecretTokenKey]
+
 			request := &gitlabWrapper.ProjectHookRequest{
 				ProjectName: req.Repository,
-				Url:         webhookURL,
-				Token:       secret[atlantisSecretTokenKey],
 				CreateOpts: &gitlab.AddProjectHookOptions{
 					MergeRequestsEvents: &enabled,
 					NoteEvents:          &enabled,
 					PushEvents:          &enabled,
-					Token:               &req.Token,
+					Token:               &token,
 					URL:                 &webhookURL,
 				},
 			}

@@ -224,7 +224,7 @@ func (gl *GitLabWrapper) CreateProjectWebhook(req *ProjectHookRequest) error {
 	if err != nil {
 		return err
 	}
-	log.Infof("created hook %s/%s", req.ProjectName, req.Url)
+	log.Infof("created hook %s/%s", req.ProjectName, *req.CreateOpts.URL)
 
 	return nil
 }
@@ -243,7 +243,7 @@ func (gl *GitLabWrapper) DeleteProjectWebhook(req *ProjectHookRequest) error {
 
 	var hookID int = 0
 	for _, hook := range webhooks {
-		if hook.ProjectID == projectID && hook.URL == req.Url {
+		if hook.ProjectID == projectID && hook.URL == *req.CreateOpts.URL {
 			hookID = hook.ID
 		}
 	}
@@ -254,7 +254,7 @@ func (gl *GitLabWrapper) DeleteProjectWebhook(req *ProjectHookRequest) error {
 	if err != nil {
 		return err
 	}
-	log.Infof("deleted hook %s/%s", req.ProjectName, req.Url)
+	log.Infof("deleted hook %s/%s", req.ProjectName, *req.CreateOpts.URL)
 
 	return nil
 }
@@ -273,7 +273,7 @@ func (gl *GitLabWrapper) UpdateProjectWebhook(req *ProjectHookRequest) error {
 
 	var hookID int = 0
 	for _, hook := range webhooks {
-		if hook.ProjectID == projectID && hook.URL == req.Url {
+		if hook.ProjectID == projectID && hook.URL == *req.CreateOpts.URL {
 			hookID = hook.ID
 		}
 	}
