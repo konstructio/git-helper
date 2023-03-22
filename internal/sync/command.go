@@ -144,11 +144,12 @@ func SynchronizeAtlantisWebhook(req WebhookOptions) error {
 		}
 
 		// Delete webhook if it exists
+		var url string = fmt.Sprintf("%s/events", configmap[ngrokExistingTunnelKey])
 		if configmap[ngrokExistingTunnelKey] != "placeholder" {
 			request := githubWrapper.RepositoryHookRequest{
 				Org:        req.Owner,
 				Repository: req.Repository,
-				Url:        configmap[ngrokExistingTunnelKey],
+				Url:        url,
 			}
 			err = gh.DeleteRepositoryWebhook(request)
 			if err != nil {
@@ -202,7 +203,7 @@ func SynchronizeAtlantisWebhook(req WebhookOptions) error {
 		}
 
 		// Delete existing webhook if it exists
-		var url string = configmap[ngrokExistingTunnelKey]
+		var url string = fmt.Sprintf("%s/events", configmap[ngrokExistingTunnelKey])
 		if configmap[ngrokExistingTunnelKey] != "placeholder" {
 			request := &gitlabWrapper.ProjectHookRequest{
 				ProjectName: req.Repository,
