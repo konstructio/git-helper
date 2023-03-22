@@ -65,8 +65,6 @@ func CreateWebhook(req WebhookOptions) error {
 		var enabled bool = true
 		request := &gitlabWrapper.ProjectHookRequest{
 			ProjectName: req.Repository,
-			Url:         req.Url,
-			Token:       req.Token,
 			CreateOpts: &gitlab.AddProjectHookOptions{
 				MergeRequestsEvents: &enabled,
 				NoteEvents:          &enabled,
@@ -107,13 +105,10 @@ func DeleteWebhook(req WebhookOptions) error {
 		var enabled bool = true
 		request := &gitlabWrapper.ProjectHookRequest{
 			ProjectName: req.Repository,
-			Url:         req.Url,
-			Token:       req.Token,
 			CreateOpts: &gitlab.AddProjectHookOptions{
 				MergeRequestsEvents: &enabled,
 				NoteEvents:          &enabled,
 				PushEvents:          &enabled,
-				Token:               &req.Token,
 				URL:                 &req.Url,
 			},
 		}
@@ -198,7 +193,7 @@ func SynchronizeAtlantisWebhook(req WebhookOptions) error {
 		gl := gitlabWrapper.GitLabWrapper{
 			Client: gitlabWrapper.NewGitLabClient(os.Getenv("GIT_TOKEN")),
 		}
-		atlantisSecretTokenKey = "ATLANTIS_GL_WEBHOOK_SECRET"
+		atlantisSecretTokenKey = "ATLANTIS_GITLAB_WEBHOOK_SECRET"
 
 		// Use ConfigMap to get existing tunnel url if one exists
 		configmap, err := kubernetes.ReadConfigMapV2(req.KubeInClusterConfig, atlantisNamespace, ngrokConfigMapName)
@@ -207,10 +202,13 @@ func SynchronizeAtlantisWebhook(req WebhookOptions) error {
 		}
 
 		// Delete existing webhook if it exists
+		var url string = configmap[ngrokExistingTunnelKey]
 		if configmap[ngrokExistingTunnelKey] != "placeholder" {
 			request := &gitlabWrapper.ProjectHookRequest{
 				ProjectName: req.Repository,
-				Url:         configmap[ngrokExistingTunnelKey],
+				CreateOpts: &gitlab.AddProjectHookOptions{
+					URL: &url,
+				},
 			}
 			err = gl.DeleteProjectWebhook(request)
 			if err != nil {
@@ -235,16 +233,17 @@ func SynchronizeAtlantisWebhook(req WebhookOptions) error {
 
 			// Create new repository secret
 			var enabled bool = true
+			var webhookURL string = fmt.Sprintf("%s/events", newWebhookEndpoint)
+			var token string = secret[atlantisSecretTokenKey]
+
 			request := &gitlabWrapper.ProjectHookRequest{
 				ProjectName: req.Repository,
-				Url:         fmt.Sprintf("%s/events", newWebhookEndpoint),
-				Token:       secret[atlantisSecretTokenKey],
 				CreateOpts: &gitlab.AddProjectHookOptions{
 					MergeRequestsEvents: &enabled,
 					NoteEvents:          &enabled,
 					PushEvents:          &enabled,
-					Token:               &req.Token,
-					URL:                 &newWebhookEndpoint,
+					Token:               &token,
+					URL:                 &webhookURL,
 				},
 			}
 			err = gl.CreateProjectWebhook(request)

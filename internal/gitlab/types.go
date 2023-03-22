@@ -20,8 +20,6 @@ type DeployTokenCreateParameters struct {
 // project hooks
 type ProjectHookRequest struct {
 	ProjectName string
-	Url         string
-	Token       string
 
 	CreateOpts *gitlab.AddProjectHookOptions
 	PatchOpts  *gitlab.EditProjectHookOptions
