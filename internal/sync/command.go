@@ -235,16 +235,17 @@ func SynchronizeAtlantisWebhook(req WebhookOptions) error {
 
 			// Create new repository secret
 			var enabled bool = true
+			var webhookURL string = fmt.Sprintf("%s/events", newWebhookEndpoint)
 			request := &gitlabWrapper.ProjectHookRequest{
 				ProjectName: req.Repository,
-				Url:         fmt.Sprintf("%s/events", newWebhookEndpoint),
+				Url:         webhookURL,
 				Token:       secret[atlantisSecretTokenKey],
 				CreateOpts: &gitlab.AddProjectHookOptions{
 					MergeRequestsEvents: &enabled,
 					NoteEvents:          &enabled,
 					PushEvents:          &enabled,
 					Token:               &req.Token,
-					URL:                 &newWebhookEndpoint,
+					URL:                 &webhookURL,
 				},
 			}
 			err = gl.CreateProjectWebhook(request)
