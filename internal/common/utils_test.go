@@ -1,7 +1,3 @@
-/*
-Copyright © 2021 Calendly Platform Engineering
-*/
-
 package common
 
 import (
