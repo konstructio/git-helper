@@ -2,7 +2,6 @@ package github
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	log "github.com/sirupsen/logrus"
@@ -42,9 +41,7 @@ func (gh *GitHubWrapper) ListRepoWebhooks(owner string, repo string) ([]*github.
 		if err != nil {
 			return []*github.Hook{}, err
 		}
-		for _, hook := range hooks {
-			container = append(container, hook)
-		}
+		container = append(container, hooks...)
 		nextPage = resp.NextPage
 	}
 	return container, nil
@@ -62,9 +59,9 @@ func (gh *GitHubWrapper) CreateRepositoryWebhook(req RepositoryHookRequest) erro
 		},
 	})
 	if err != nil {
-		return errors.New(fmt.Sprintf("error when creating a webhook: %v", err))
+		return fmt.Errorf("error when creating a webhook: %v", err)
 	}
-	log.Infof("created hook %s/%s/%s", req.Org, req.Repository, req.Url)
+	log.Infof("created hook %s/%s / %s", req.Org, req.Repository, req.Url)
 
 	return nil
 }
@@ -87,9 +84,9 @@ func (gh *GitHubWrapper) DeleteRepositoryWebhook(req RepositoryHookRequest) erro
 		if err != nil {
 			return err
 		}
-		log.Infof("deleted hook %s/%s/%s", req.Org, req.Repository, req.Url)
+		log.Infof("deleted hook %s/%s / %s", req.Org, req.Repository, req.Url)
 	} else {
-		return errors.New(fmt.Sprintf("hook %s/%s/%s not found", req.Org, req.Repository, req.Url))
+		return fmt.Errorf("hook %s/%s / %s not found", req.Org, req.Repository, req.Url)
 	}
 
 	return nil
@@ -119,11 +116,11 @@ func (gh *GitHubWrapper) UpdateRepositoryWebhook(req RepositoryHookRequest) erro
 			},
 		})
 		if err != nil {
-			return errors.New(fmt.Sprintf("error when creating a webhook: %v", err))
+			return fmt.Errorf("error when creating a webhook: %v", err)
 		}
-		log.Infof("updated hook %s/%s/%s", req.Org, req.Repository, req.Url)
+		log.Infof("updated hook %s/%s / %s", req.Org, req.Repository, req.Url)
 	} else {
-		return errors.New(fmt.Sprintf("hook %s/%s/%s not found", req.Org, req.Repository, req.Url))
+		return fmt.Errorf("hook %s/%s / %s not found", req.Org, req.Repository, req.Url)
 	}
 
 	return nil
