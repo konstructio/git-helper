@@ -1,27 +1,66 @@
 package gitlabcloud
 
 import (
-	"errors"
 	"fmt"
+	"strings"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/xanzy/go-gitlab"
 )
 
-func NewGitLabClient(token string) *gitlab.Client {
-	if token == "" {
-		log.Fatal("you must provide a token when using gitlab as a provider")
-	}
-
+// NewGitLabClient instantiates a wrapper to communicate with GitLab
+// It sets the path and ID of the group under which resources will be managed
+func NewGitLabClient(token string, parentGroupName string) (GitLabWrapper, error) {
 	git, err := gitlab.NewClient(token)
 	if err != nil {
-		log.Fatal(err)
+		return GitLabWrapper{}, fmt.Errorf("error instantiating gitlab client: %s", err)
 	}
 
-	return git
+	// Get parent group ID
+	minAccessLevel := gitlab.AccessLevelValue(gitlab.DeveloperPermissions)
+	container := make([]gitlab.Group, 0)
+	for nextPage := 1; nextPage > 0; {
+		groups, resp, err := git.Groups.ListGroups(&gitlab.ListGroupsOptions{
+			ListOptions: gitlab.ListOptions{
+				Page:    nextPage,
+				PerPage: 10,
+			},
+			MinAccessLevel: &minAccessLevel,
+		})
+		if err != nil {
+			return GitLabWrapper{}, fmt.Errorf("could not get gitlab groups: %s", err)
+		}
+		for _, group := range groups {
+			container = append(container, *group)
+		}
+		nextPage = resp.NextPage
+	}
+	var gid int = 0
+	for _, group := range container {
+		if group.FullPath == parentGroupName {
+			gid = group.ID
+		} else {
+			continue
+		}
+	}
+	if gid == 0 {
+		return GitLabWrapper{}, fmt.Errorf("could not find gitlab group %s", parentGroupName)
+	}
+
+	// Get parent group path
+	group, _, err := git.Groups.GetGroup(gid, &gitlab.GetGroupOptions{})
+	if err != nil {
+		return GitLabWrapper{}, fmt.Errorf("could not get gitlab parent group path: %s", err)
+	}
+
+	return GitLabWrapper{
+		Client:          git,
+		ParentGroupID:   gid,
+		ParentGroupPath: group.FullPath,
+	}, nil
 }
 
-// CheckProjectExists
+// CheckProjectExists within a parent group
 func (gl *GitLabWrapper) CheckProjectExists(projectName string) (bool, error) {
 	allprojects, err := gl.GetProjects()
 	if err != nil {
@@ -38,18 +77,15 @@ func (gl *GitLabWrapper) CheckProjectExists(projectName string) (bool, error) {
 	return exists, nil
 }
 
-// GetProjectID
+// GetProjectID returns a project's ID scoped to the parent group
 func (gl *GitLabWrapper) GetProjectID(projectName string) (int, error) {
-	owned := true
-
 	container := make([]gitlab.Project, 0)
 	for nextPage := 1; nextPage > 0; {
-		projects, resp, err := gl.Client.Projects.ListProjects(&gitlab.ListProjectsOptions{
+		projects, resp, err := gl.Client.Groups.ListGroupProjects(gl.ParentGroupID, &gitlab.ListGroupProjectsOptions{
 			ListOptions: gitlab.ListOptions{
 				Page:    nextPage,
 				PerPage: 10,
 			},
-			Owned: &owned,
 		})
 		if err != nil {
 			return 0, err
@@ -61,130 +97,33 @@ func (gl *GitLabWrapper) GetProjectID(projectName string) (int, error) {
 	}
 
 	for _, project := range container {
-		if project.Name == projectName {
+		if !strings.Contains(project.Name, "deleted") &&
+			strings.ToLower(project.Name) == projectName {
 			return project.ID, nil
 		}
 	}
 
-	return 0, errors.New(fmt.Sprintf("could not get project ID for project %s", projectName))
+	return 0, fmt.Errorf("could not get project ID for project %s", projectName)
 }
 
-// GetProjects
+// GetProjects for a specific parent group by ID
 func (gl *GitLabWrapper) GetProjects() ([]gitlab.Project, error) {
-	owned := true
-
 	container := make([]gitlab.Project, 0)
 	for nextPage := 1; nextPage > 0; {
-		projects, resp, err := gl.Client.Projects.ListProjects(&gitlab.ListProjectsOptions{
+		projects, resp, err := gl.Client.Groups.ListGroupProjects(gl.ParentGroupID, &gitlab.ListGroupProjectsOptions{
 			ListOptions: gitlab.ListOptions{
 				Page:    nextPage,
 				PerPage: 10,
 			},
-			Owned: &owned,
 		})
 		if err != nil {
 			return []gitlab.Project{}, err
 		}
 		for _, project := range projects {
-			container = append(container, *project)
-		}
-		nextPage = resp.NextPage
-	}
-
-	return container, nil
-}
-
-// Token & Key Management
-
-// CreateProjectDeployToken
-func (gl *GitLabWrapper) CreateProjectDeployToken(projectName string, p *DeployTokenCreateParameters) (string, error) {
-	projectID, err := gl.GetProjectID(projectName)
-	if err != nil {
-		return "", err
-	}
-
-	// Check to see if the token already exists
-	allTokens, err := gl.ListProjectDeployTokens(projectName)
-	if err != nil {
-		return "", err
-	}
-
-	var exists bool = false
-	for _, token := range allTokens {
-		if token.Name == p.Name {
-			exists = true
-		}
-	}
-
-	if !exists {
-		token, _, err := gl.Client.DeployTokens.CreateProjectDeployToken(projectID, &gitlab.CreateProjectDeployTokenOptions{
-			Name:     &p.Name,
-			Username: &p.Username,
-			Scopes:   &p.Scopes,
-		})
-		if err != nil {
-			return "", err
-		}
-		log.Infof("created deploy token %s", token.Name)
-
-		return token.Token, nil
-	} else {
-		log.Infof("deploy token %s already exists - skipping", p.Name)
-		return "", nil
-	}
-}
-
-// DeleteProjectDeployToken
-func (gl *GitLabWrapper) DeleteProjectDeployToken(projectName string, tokenName string) error {
-	projectID, err := gl.GetProjectID(projectName)
-	if err != nil {
-		return err
-	}
-
-	allTokens, err := gl.ListProjectDeployTokens(projectName)
-	if err != nil {
-		return err
-	}
-
-	var exists bool = false
-	var tokenID int
-	for _, token := range allTokens {
-		if token.Name == tokenName {
-			exists = true
-			tokenID = token.ID
-		}
-	}
-
-	if exists {
-		_, err = gl.Client.DeployTokens.DeleteProjectDeployToken(projectID, tokenID)
-		if err != nil {
-			return err
-		}
-		log.Infof("deleted deploy token %s", tokenName)
-	}
-
-	return nil
-
-}
-
-// ListProjectDeployTokens
-func (gl *GitLabWrapper) ListProjectDeployTokens(projectName string) ([]gitlab.DeployToken, error) {
-	projectID, err := gl.GetProjectID(projectName)
-	if err != nil {
-		return []gitlab.DeployToken{}, err
-	}
-
-	container := make([]gitlab.DeployToken, 0)
-	for nextPage := 1; nextPage > 0; {
-		tokens, resp, err := gl.Client.DeployTokens.ListProjectDeployTokens(projectID, &gitlab.ListProjectDeployTokensOptions{
-			Page:    nextPage,
-			PerPage: 10,
-		})
-		if err != nil {
-			return []gitlab.DeployToken{}, err
-		}
-		for _, token := range tokens {
-			container = append(container, *token)
+			// Skip deleted projects
+			if !strings.Contains(project.Name, "deleted") {
+				container = append(container, *project)
+			}
 		}
 		nextPage = resp.NextPage
 	}
@@ -224,7 +163,7 @@ func (gl *GitLabWrapper) CreateProjectWebhook(req *ProjectHookRequest) error {
 	if err != nil {
 		return err
 	}
-	log.Infof("created hook %s/%s", req.ProjectName, *req.CreateOpts.URL)
+	log.Infof("created hook %s / %s", req.ProjectName, *req.CreateOpts.URL)
 
 	return nil
 }
@@ -248,7 +187,7 @@ func (gl *GitLabWrapper) DeleteProjectWebhook(req *ProjectHookRequest) error {
 		}
 	}
 	if hookID == 0 {
-		return errors.New(fmt.Sprintf("no webhooks were found for project %s given search parameters", req.ProjectName))
+		return fmt.Errorf("no webhooks were found for project %s given search parameters", req.ProjectName)
 	}
 	_, err = gl.Client.Projects.DeleteProjectHook(projectID, hookID)
 	if err != nil {
@@ -278,7 +217,7 @@ func (gl *GitLabWrapper) UpdateProjectWebhook(req *ProjectHookRequest) error {
 		}
 	}
 	if hookID == 0 {
-		return errors.New(fmt.Sprintf("no webhooks were found for project %s given search parameters", req.ProjectName))
+		return fmt.Errorf("no webhooks were found for project %s given search parameters", req.ProjectName)
 	}
 	_, _, err = gl.Client.Projects.EditProjectHook(projectID, hookID, req.PatchOpts)
 	if err != nil {

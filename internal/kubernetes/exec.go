@@ -2,7 +2,6 @@ package kubernetes
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	log "github.com/sirupsen/logrus"
@@ -32,7 +31,7 @@ func ReadConfigMapV2(inCluster bool, namespace string, configMapName string) (ma
 
 	configMap, err := clientset.CoreV1().ConfigMaps(namespace).Get(context.Background(), configMapName, metav1.GetOptions{})
 	if err != nil {
-		return map[string]string{}, errors.New(fmt.Sprintf("error getting ConfigMap: %s\n", err))
+		return map[string]string{}, fmt.Errorf("error getting ConfigMap: %s", err)
 	}
 
 	parsedSecretData := make(map[string]string)
@@ -49,7 +48,7 @@ func ReadSecretV2(inCluster bool, namespace string, secretName string) (map[stri
 
 	secret, err := clientset.CoreV1().Secrets(namespace).Get(context.Background(), secretName, metav1.GetOptions{})
 	if err != nil {
-		return map[string]string{}, errors.New(fmt.Sprintf("error getting secret: %s\n", err))
+		return map[string]string{}, fmt.Errorf("error getting secret: %s", err)
 	}
 
 	parsedSecretData := make(map[string]string)
@@ -66,7 +65,7 @@ func UpdateConfigMapV2(inCluster bool, namespace, configMapName string, key stri
 
 	configMap, err := clientset.CoreV1().ConfigMaps(namespace).Get(context.Background(), configMapName, metav1.GetOptions{})
 	if err != nil {
-		return errors.New(fmt.Sprintf("error getting ConfigMap: %s\n", err))
+		return fmt.Errorf("error getting ConfigMap: %s", err)
 	}
 
 	configMap.Data = map[string]string{key: value}
@@ -75,7 +74,9 @@ func UpdateConfigMapV2(inCluster bool, namespace, configMapName string, key stri
 		configMap,
 		metav1.UpdateOptions{},
 	)
-
+	if err != nil {
+		return err
+	}
 	log.Infof("updated ConfigMap %s in Namespace %s\n", configMap.Name, configMap.Namespace)
 
 	return nil

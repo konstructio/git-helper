@@ -1,6 +1,3 @@
-/*
-Copyright © 2023 NAME HERE <EMAIL ADDRESS>
-*/
 package cmd
 
 import (
@@ -14,8 +11,7 @@ import (
 var (
 	syncWebhookOpts *sync.WebhookOptions = &sync.WebhookOptions{}
 
-	allowedGitProviders   []string = []string{"github", "gitlab"}
-	allowsWebhookSyncOpts []string = []string{"create", "delete"}
+	allowedGitProviders []string = []string{"github", "gitlab"}
 )
 
 // syncCmd represents the sync command
@@ -44,10 +40,7 @@ var syncWebhookCreateCmd = &cobra.Command{
 	Short: "Create a target repository/project webhook",
 	Long:  `Create a target repository/project webhook`,
 	Run: func(cmd *cobra.Command, args []string) {
-		err := sync.CreateWebhook(*syncWebhookOpts)
-		if err != nil {
-			log.Fatalf("error running command: %s", err)
-		}
+		fmt.Println("sync webhook create called")
 	},
 }
 

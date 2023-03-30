@@ -1,7 +1,6 @@
 package sync
 
 import (
-	"errors"
 	"fmt"
 
 	"os"
@@ -27,61 +26,6 @@ const (
 // Webhook token key
 var atlantisSecretTokenKey string
 
-// CreateWebhook
-func CreateWebhook(req WebhookOptions) error {
-	if req.UseSecret {
-		if req.SecretName == "" {
-			return errors.New("option --secret-name is required if using --use-secret")
-		}
-		if req.SecretValues == "" {
-			return errors.New("option --secret-values is required if using --use-secret")
-		}
-
-		secretValues, err := kubernetes.ReadSecretV2(req.KubeInClusterConfig, req.SecretNamespace, req.SecretName)
-		if err != nil {
-			fmt.Println(secretValues)
-			return err
-		}
-	}
-
-	switch req.Provider {
-	case "github":
-		gh := githubWrapper.NewGitHubClient(os.Getenv("GITHUB_TOKEN"))
-		request := githubWrapper.RepositoryHookRequest{
-			Org:        req.Owner,
-			Repository: req.Repository,
-			Url:        req.Url,
-			Token:      req.Token,
-		}
-		err := gh.CreateRepositoryWebhook(request)
-		if err != nil {
-			return err
-		}
-	case "gitlab":
-		gl := gitlabWrapper.GitLabWrapper{
-			Client: gitlabWrapper.NewGitLabClient(os.Getenv("GITLAB_TOKEN")),
-		}
-
-		var enabled bool = true
-		request := &gitlabWrapper.ProjectHookRequest{
-			ProjectName: req.Repository,
-			CreateOpts: &gitlab.AddProjectHookOptions{
-				MergeRequestsEvents: &enabled,
-				NoteEvents:          &enabled,
-				PushEvents:          &enabled,
-				Token:               &req.Token,
-				URL:                 &req.Url,
-			},
-		}
-		err := gl.CreateProjectWebhook(request)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
 // DeleteWebhook
 func DeleteWebhook(req WebhookOptions) error {
 	switch req.Provider {
@@ -98,8 +42,9 @@ func DeleteWebhook(req WebhookOptions) error {
 			return err
 		}
 	case "gitlab":
-		gl := gitlabWrapper.GitLabWrapper{
-			Client: gitlabWrapper.NewGitLabClient(os.Getenv("GITLAB_TOKEN")),
+		gitlabClient, err := gitlabWrapper.NewGitLabClient(os.Getenv("GIT_TOKEN"), req.Owner)
+		if err != nil {
+			return err
 		}
 
 		var enabled bool = true
@@ -112,7 +57,7 @@ func DeleteWebhook(req WebhookOptions) error {
 				URL:                 &req.Url,
 			},
 		}
-		err := gl.DeleteProjectWebhook(request)
+		err = gitlabClient.DeleteProjectWebhook(request)
 		if err != nil {
 			return err
 		}
@@ -191,8 +136,9 @@ func SynchronizeAtlantisWebhook(req WebhookOptions) error {
 			}
 		}
 	case "gitlab":
-		gl := gitlabWrapper.GitLabWrapper{
-			Client: gitlabWrapper.NewGitLabClient(os.Getenv("GIT_TOKEN")),
+		gitlabClient, err := gitlabWrapper.NewGitLabClient(os.Getenv("GIT_TOKEN"), req.Owner)
+		if err != nil {
+			return err
 		}
 		atlantisSecretTokenKey = "ATLANTIS_GITLAB_WEBHOOK_SECRET"
 
@@ -211,7 +157,7 @@ func SynchronizeAtlantisWebhook(req WebhookOptions) error {
 					URL: &url,
 				},
 			}
-			err = gl.DeleteProjectWebhook(request)
+			err = gitlabClient.DeleteProjectWebhook(request)
 			if err != nil {
 				log.Errorf("error deleting existing webhook: %s", err)
 			}
@@ -247,7 +193,7 @@ func SynchronizeAtlantisWebhook(req WebhookOptions) error {
 					URL:                 &webhookURL,
 				},
 			}
-			err = gl.CreateProjectWebhook(request)
+			err = gitlabClient.CreateProjectWebhook(request)
 			if err != nil {
 				return err
 			}
